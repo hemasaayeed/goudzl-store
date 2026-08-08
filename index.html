@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>goudzl — سوق الحسابات</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@500;700;800&family=Tajawal:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0d12;
+    --bg-grad: radial-gradient(1200px 500px at 50% -10%, #14213a 0%, #0a0d12 55%);
+    --panel: #131820;
+    --panel-2: #171d27;
+    --line: #232a36;
+    --line-soft: #1a2029;
+    --text: #eef1f5;
+    --muted: #8b95a5;
+    --accent: #4fd1c5;
+    --accent-2: #9b8cff;
+    --pulse: #34d399;
+    --price-bg: #10241d;
+    --price-text: #4fe0b0;
+    --old-bg: #241c0e;
+    --old-text: #f4c04a;
+  }
+  * { box-sizing: border-box; }
+  body {
+     margin: 0;
+     background:
+       linear-gradient(rgba(5, 7, 10, 0.42), rgba(5, 7, 10, 0.58)),
+       url("./goudzl_pbg_camo_background.png") center top / cover fixed no-repeat;
+     color: var(--text);
+    font-family: 'Tajawal', 'Segoe UI', Tahoma, Arial, sans-serif;
+    min-height: 100vh;
+  }
+  a { color: inherit; text-decoration: none; }
+
+  header {
+    position: sticky;
+    top: 0;
+    background: rgba(10,13,18,0.85);
+    backdrop-filter: blur(10px);
+    border-bottom: 1px solid var(--line);
+    padding: 18px 20px 14px;
+    z-index: 10;
+  }
+  .header-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+  .brand { display: flex; align-items: center; gap: 10px; font-family: 'Cairo', sans-serif; font-weight: 800; font-size: 20px; letter-spacing: 0.2px; }
+  .brand .g { color: var(--accent); }
+  .live-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--pulse); box-shadow: 0 0 0 0 rgba(52,211,153,0.6); animation: pulse 1.8s infinite; }
+  @keyframes pulse { 0% { box-shadow: 0 0 0 0 rgba(52,211,153,0.55); } 70% { box-shadow: 0 0 0 9px rgba(52,211,153,0); } 100% { box-shadow: 0 0 0 0 rgba(52,211,153,0); } }
+  .status { color: var(--muted); font-size: 12px; }
+
+  .filters { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
+  .filters::-webkit-scrollbar { display: none; }
+  .filter-btn {
+    flex-shrink: 0; background: var(--panel); color: var(--text); border: 1px solid var(--line);
+    padding: 9px 17px; border-radius: 999px; font-size: 13.5px; font-weight: 500; cursor: pointer;
+    transition: 0.15s; white-space: nowrap; font-family: 'Tajawal', sans-serif;
+  }
+  .filter-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .filter-btn.active { background: var(--accent); border-color: var(--accent); color: #062420; font-weight: 700; }
+
+  main { max-width: 700px; margin: 0 auto; padding: 22px 16px 60px; }
+
+  .section-title { font-size: 14px; color: var(--muted); margin: 4px 2px 12px; font-weight: 500; }
+  .section-title .em { color: var(--old-text); }
+
+  .suggested-row { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 16px; margin-bottom: 24px; border-bottom: 1px solid var(--line-soft); scrollbar-width: none; }
+  .suggested-row::-webkit-scrollbar { display: none; }
+  .suggested-card {
+    flex-shrink: 0; width: 195px; background: var(--panel-2); border: 1px solid var(--line);
+    border-radius: 14px; overflow: hidden; transition: 0.15s; cursor: pointer;
+  }
+  .suggested-card:hover { border-color: var(--old-text); transform: translateY(-2px); }
+  .suggested-card .thumb-wrap { width: 100%; height: 115px; background: #0a0c0e; overflow: hidden; }
+  .suggested-card img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .suggested-card .sc-body { padding: 11px; }
+  .suggested-card .sc-text { font-size: 12.5px; max-height: 46px; overflow: hidden; line-height: 1.5; color: var(--text); }
+  .badge-old { display: inline-block; font-size: 10.5px; font-weight: 700; color: var(--old-text); background: rgba(244,192,74,0.12); border: 1px solid rgba(244,192,74,0.3); padding: 2px 9px; border-radius: 999px; margin-bottom: 7px; }
+
+  .post {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 16px;
+    padding: 17px 19px; margin-bottom: 14px; animation: fadeIn 0.35s ease;
+    transition: 0.15s; cursor: pointer; position: relative;
+  }
+  .post:hover { border-color: var(--accent); box-shadow: 0 4px 18px rgba(0,0,0,0.25); }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(-6px); } to { opacity: 1; transform: translateY(0); } }
+
+  .post-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+  .price-tag { display: inline-block; background: var(--price-bg); color: var(--price-text); font-weight: 700; font-size: 14.5px; padding: 5px 13px; border-radius: 9px; font-family: 'Cairo', sans-serif; }
+  .contact-hint { font-size: 12px; color: var(--accent-2); display: flex; align-items: center; gap: 4px; }
+
+  .post-text { white-space: pre-wrap; line-height: 1.75; font-size: 15.5px; }
+  .post img, .post video { width: 100%; border-radius: 12px; margin-top: 12px; display: block; max-height: 340px; object-fit: cover; }
+  .post-meta { margin-top: 11px; color: var(--muted); font-size: 12px; }
+
+  .empty, .error { text-align: center; color: var(--muted); padding: 60px 20px; line-height: 1.9; font-size: 14.5px; }
+  .error { color: #f4826b; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-top">
+    <div class="brand"><span class="live-dot"></span> <span class="g">goudzl</span>&nbsp;— سوق الحسابات</div>
+    <div class="status" id="status">بيتحدث تلقائي…</div>
+  </div>
+  <div class="filters">
+    <button class="filter-btn active" data-tier="">كل الأسعار</button>
+    <button class="filter-btn" data-tier="100_5000">100 - 5,000</button>
+    <button class="filter-btn" data-tier="5000_10000">5,000 - 10,000</button>
+    <button class="filter-btn" data-tier="10000_20000">10,000 - 20,000</button>
+    <button class="filter-btn" data-tier="20000_50000">20,000 - 50,000</button>
+    <button class="filter-btn" data-tier="50000_100000">50,000 - 100,000</button>
+  </div>
+</header>
+
+<main>
+  <div id="suggestedSection" style="display:none;">
+    <div class="section-title"><span class="em">★</span> مقترح ليك — معروضة من فترة ولسه متاحة</div>
+    <div class="suggested-row" id="suggestedRow"></div>
+  </div>
+  <div id="feed"><div class="empty">بيجيب العروض…</div></div>
+</main>
+
+<script>
+  // ==== الإعدادات ====
+  const CHANNEL = "goudzl";
+  // حط يوزر تيليجرام بتاعك هنا بدون @
+  const OWNER_USERNAME = "YOUR_USERNAME";
+  const REFRESH_MS = 25000;
+  const MAX_AGE_DAYS = 30;
+
+  function proxied(url) {
+    return "https://api.allorigins.win/raw?url=" + encodeURIComponent(url);
+  }
+
+  const FEED = document.getElementById('feed');
+  const STATUS = document.getElementById('status');
+  const SUGGESTED_SECTION = document.getElementById('suggestedSection');
+  const SUGGESTED_ROW = document.getElementById('suggestedRow');
+  let currentTier = '';
+  let allPosts = [];
+
+  function extractPrice(text) {
+    if (!text) return null;
+    let m = text.match(/(\d+(?:\.\d+)?)\s*(?:الف|ألف|k)\b/i);
+    if (m) return Math.round(parseFloat(m[1]) * 1000);
+    m = text.match(/(?:السعر|بسعر|سعر)\D{0,10}(\d[\d,\.]{1,9})/);
+    if (m) return parseInt(m[1].replace(/,/g, '').split('.')[0]);
+    m = text.replace(/,/g, '').match(/\b(\d{3,7})\b/);
+    if (m) return parseInt(m[1]);
+    return null;
+  }
+
+  // بيدور على @username جوه النص عشان يعرف يوصل الزائر بصاحب العرض
+  function extractContactUsername(text) {
+    if (!text) return null;
+    const m = text.match(/@([a-zA-Z0-9_]{4,32})/);
+    return m ? m[1] : null;
+  }
+
+  function postLink(p) {
+    if (OWNER_USERNAME && OWNER_USERNAME !== "YOUR_USERNAME") {
+      return `https://t.me/${OWNER_USERNAME.replace(/^@/, '')}`;
+    }
+    return `https://t.me/${CHANNEL}`;
+  }
+
+  async function fetchChannel() {
+    const url = `https://t.me/s/${CHANNEL}`;
+    const res = await fetch(proxied(url));
+    if (!res.ok) throw new Error('فشل الاتصال بتليجرام');
+    const html = await res.text();
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    const wraps = doc.querySelectorAll('.tgme_widget_message_wrap');
+
+    const posts = [];
+    wraps.forEach(wrap => {
+      const msgEl = wrap.querySelector('.tgme_widget_message');
+      if (!msgEl) return;
+      const id = msgEl.getAttribute('data-post') || '';
+
+      const textEl = wrap.querySelector('.tgme_widget_message_text');
+      const text = textEl ? textEl.innerText.trim() : '';
+
+      const timeEl = wrap.querySelector('time');
+      const dateStr = timeEl ? timeEl.getAttribute('datetime') : null;
+      const date = dateStr ? new Date(dateStr).getTime() / 1000 : Date.now() / 1000;
+
+      let mediaUrl = null;
+      const photoEl = wrap.querySelector('.tgme_widget_message_photo_wrap');
+      if (photoEl) {
+        const style = photoEl.getAttribute('style') || '';
+        const m = style.match(/url\(['"]?(.*?)['"]?\)/);
+        if (m) mediaUrl = m[1];
+      }
+      const videoEl = wrap.querySelector('video');
+      if (!mediaUrl && videoEl) mediaUrl = videoEl.getAttribute('src');
+
+      if (!text && !mediaUrl) return;
+
+      posts.push({ id, text, date, mediaUrl, price: extractPrice(text) });
+    });
+
+    return posts.sort((a, b) => b.date - a.date);
+  }
+
+  function priceLabel(p) {
+    if (p == null) return '<span></span>';
+    return `<span class="price-tag">${p.toLocaleString('en-US')} جنيه</span>`;
+  }
+
+  function openPost(p) {
+    window.open(postLink(p), '_blank', 'noopener');
+  }
+
+  function renderPost(p) {
+    const div = document.createElement('div');
+    div.className = 'post';
+    div.addEventListener('click', () => openPost(p));
+    let html = `<div class="post-top">${priceLabel(p.price)}<span class="contact-hint">تواصل ↗</span></div>`;
+    if (p.text) html += `<div class="post-text"></div>`;
+    if (p.mediaUrl) html += `<img src="${p.mediaUrl}" loading="lazy">`;
+    const d = new Date(p.date * 1000);
+    html += `<div class="post-meta">${d.toLocaleString('ar-EG')}</div>`;
+    div.innerHTML = html;
+    if (p.text) div.querySelector('.post-text').textContent = p.text;
+    return div;
+  }
+
+  function renderSuggestedCard(p) {
+    const div = document.createElement('div');
+    div.className = 'suggested-card';
+    div.addEventListener('click', () => openPost(p));
+    let html = '';
+    if (p.mediaUrl) html += `<div class="thumb-wrap"><img src="${p.mediaUrl}" loading="lazy"></div>`;
+    html += `<div class="sc-body"><span class="badge-old">من فترة</span>${priceLabel(p.price)}<div class="sc-text"></div></div>`;
+    div.innerHTML = html;
+    if (p.text) div.querySelector('.sc-text').textContent = p.text;
+    return div;
+  }
+
+  function renderAll() {
+    const ranges = {
+      "100_5000": [100, 5000],
+      "5000_10000": [5000, 10000],
+      "10000_20000": [10000, 20000],
+      "20000_50000": [20000, 50000],
+      "50000_100000": [50000, 100000]
+    };
+    const now = Date.now() / 1000;
+    const maxAgeSec = MAX_AGE_DAYS * 24 * 60 * 60;
+
+    // الفييد الرئيسي: من الأحدث لحد آخر عرض عدّى عليه 30 يوم بالظبط
+    let list = allPosts.filter(p => (now - p.date) <= maxAgeSec);
+    if (currentTier) {
+      const range = ranges[currentTier];
+      if (range) {
+        const [minPrice, maxPrice] = range;
+        list = list.filter(p => p.price != null && p.price >= minPrice && p.price <= maxPrice);
+      }
+    }
+
+    FEED.innerHTML = '';
+    if (list.length === 0) {
+      FEED.innerHTML = '<div class="empty">مفيش عروض في الفئة دي حاليًا.</div>';
+    } else {
+      list.forEach(p => FEED.appendChild(renderPost(p)));
+    }
+
+    // مقترح ليك: العروض اللي عدّى عليها أكتر من 30 يوم ولسه موجودة في القناة
+    const older = allPosts.filter(p => (now - p.date) > maxAgeSec).slice(0, 10);
+    if (older.length > 0) {
+      SUGGESTED_ROW.innerHTML = '';
+      older.forEach(p => SUGGESTED_ROW.appendChild(renderSuggestedCard(p)));
+      SUGGESTED_SECTION.style.display = 'block';
+    } else {
+      SUGGESTED_SECTION.style.display = 'none';
+    }
+  }
+
+  async function refresh() {
+    try {
+      allPosts = await fetchChannel();
+      STATUS.textContent = 'متصل — بيتحدث تلقائي';
+      renderAll();
+    } catch (e) {
+      STATUS.textContent = 'تعذر الاتصال، هيحاول تاني…';
+      if (allPosts.length === 0) {
+        FEED.innerHTML = '<div class="error">مقدرش أجيب المحتوى دلوقتي. اتأكد إن اسم القناة صح وإنها عامة، أو حاول تاني بعد شوية.</div>';
+      }
+    }
+  }
+
+  document.querySelectorAll('.filter-btn').forEach(btn => {
+    btn.addEventListener('click', function () {
+      document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+      this.classList.add('active');
+      currentTier = this.getAttribute('data-tier') || '';
+      renderAll();
+    });
+  });
+  });
+
+  refresh();
+  setInterval(refresh, REFRESH_MS);
+</script>
+
+</body>
+</html>
