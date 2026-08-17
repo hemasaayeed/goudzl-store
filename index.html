@@ -26,12 +26,12 @@
     --old-text: #f4c04a;
   }
   * { box-sizing: border-box; }
-    body {
-     margin: 0;
-     background:
-       linear-gradient(rgba(5, 7, 10, 0.42), rgba(5, 7, 10, 0.58)),
-       url("./goudzl_pbg_camo_background.png") center top / cover fixed no-repeat;
-     color: var(--text);
+  body {
+    margin: 0;
+    background:
+      linear-gradient(180deg, rgba(8,8,6,0.82) 0%, rgba(8,8,6,0.93) 55%, #0a0906 100%),
+      url('bg.jpg') center top / cover no-repeat fixed;
+    color: var(--text);
     font-family: 'Tajawal', 'Segoe UI', Tahoma, Arial, sans-serif;
     min-height: 100vh;
   }
@@ -110,11 +110,11 @@
   </div>
   <div class="filters">
     <button class="filter-btn active" data-tier="">كل الأسعار</button>
-    <button class="filter-btn" data-tier="100_5000">100 - 5,000</button>
-    <button class="filter-btn" data-tier="5000_10000">5,000 - 10,000</button>
-    <button class="filter-btn" data-tier="10000_20000">10,000 - 20,000</button>
-    <button class="filter-btn" data-tier="20000_50000">20,000 - 50,000</button>
-    <button class="filter-btn" data-tier="50000_100000">50,000 - 100,000</button>
+    <button class="filter-btn" data-tier="under_2000">أقل من 2,000</button>
+    <button class="filter-btn" data-tier="under_10000">أقل من 10,000</button>
+    <button class="filter-btn" data-tier="under_20000">أقل من 20,000</button>
+    <button class="filter-btn" data-tier="under_50000">أقل من 50,000</button>
+    <button class="filter-btn" data-tier="under_100000">أقل من 100,000</button>
   </div>
 </header>
 
@@ -129,13 +129,25 @@
 <script>
   // ==== الإعدادات ====
   const CHANNEL = "goudzl";
-  // حط يوزر تيليجرام بتاعك هنا بدون @
-  const OWNER_USERNAME = "YOUR_USERNAME";
   const REFRESH_MS = 25000;
   const MAX_AGE_DAYS = 30;
 
-  function proxied(url) {
-    return "https://api.allorigins.win/raw?url=" + encodeURIComponent(url);
+  // أكتر من رابط proxy احتياطي - لو الأول اتأخر أو فشل بيجرب اللي بعده
+  const PROXIES = [
+    (url) => "https://api.allorigins.win/raw?url=" + encodeURIComponent(url) + "&_=" + Date.now(),
+    (url) => "https://corsproxy.io/?url=" + encodeURIComponent(url) + "&_=" + Date.now(),
+    (url) => "https://api.codetabs.com/v1/proxy?quest=" + encodeURIComponent(url) + "&_=" + Date.now(),
+  ];
+
+  async function fetchWithTimeout(url, ms) {
+    const controller = new AbortController();
+    const t = setTimeout(() => controller.abort(), ms);
+    try {
+      const res = await fetch(url, { cache: "no-store", signal: controller.signal });
+      return res;
+    } finally {
+      clearTimeout(t);
+    }
   }
 
   const FEED = document.getElementById('feed');
@@ -164,32 +176,50 @@
   }
 
   function postLink(p) {
-    if (OWNER_USERNAME && OWNER_USERNAME !== "YOUR_USERNAME") {
-      return `https://t.me/${OWNER_USERNAME.replace(/^@/, '')}`;
-    }
+    const username = extractContactUsername(p.text);
+    if (username) return `https://t.me/${username}`;
+    if (p.id && p.id.includes('/')) return `https://t.me/${p.id}`;
     return `https://t.me/${CHANNEL}`;
   }
 
   async function fetchChannel() {
-    const url = `https://t.me/s/${CHANNEL}`;
-    const res = await fetch(proxied(url));
-    if (!res.ok) throw new Error('فشل الاتصال بتليجرام');
-    const html = await res.text();
+    const targetUrl = `https://t.me/s/${CHANNEL}`;
+    let html = null;
+    let lastErr = null;
+
+    for (const buildProxyUrl of PROXIES) {
+      try {
+        const res = await fetchWithTimeout(buildProxyUrl(targetUrl), 8000);
+        if (!res.ok) throw new Error('bad status');
+        html = await res.text();
+        if (html && html.length > 500) break; // رد سليم، وقف هنا
+      } catch (e) {
+        lastErr = e;
+        html = null;
+      }
+    }
+
+    if (!html) throw lastErr || new Error('فشل الاتصال بتليجرام');
+
     const doc = new DOMParser().parseFromString(html, 'text/html');
     const wraps = doc.querySelectorAll('.tgme_widget_message_wrap');
 
+    const seen = new Set();
     const posts = [];
     wraps.forEach(wrap => {
       const msgEl = wrap.querySelector('.tgme_widget_message');
       if (!msgEl) return;
       const id = msgEl.getAttribute('data-post') || '';
+      if (id && seen.has(id)) return; // منع التكرار (البوستات اللي فيها أكتر من صورة بتتكرر جوه الصفحة)
+      if (id) seen.add(id);
 
       const textEl = wrap.querySelector('.tgme_widget_message_text');
       const text = textEl ? textEl.innerText.trim() : '';
 
       const timeEl = wrap.querySelector('time');
       const dateStr = timeEl ? timeEl.getAttribute('datetime') : null;
-      const date = dateStr ? new Date(dateStr).getTime() / 1000 : Date.now() / 1000;
+      if (!dateStr) return; // من غير تاريخ صحيح مينفعش نرتب صح، نتجاهله بدل ما يبوظ الترتيب
+      const date = new Date(dateStr).getTime() / 1000;
 
       let mediaUrl = null;
       const photoEl = wrap.querySelector('.tgme_widget_message_photo_wrap');
@@ -206,7 +236,8 @@
       posts.push({ id, text, date, mediaUrl, price: extractPrice(text) });
     });
 
-    return posts.sort((a, b) => b.date - a.date);
+    posts.sort((a, b) => b.date - a.date); // الأحدث فوق دايمًا، بغض النظر عن ترتيبهم في صفحة تليجرام
+    return posts;
   }
 
   function priceLabel(p) {
@@ -254,10 +285,7 @@
 
     // الفييد الرئيسي: من الأحدث لحد آخر عرض عدّى عليه 30 يوم بالظبط
     let list = allPosts.filter(p => (now - p.date) <= maxAgeSec);
-    if (currentTier) {
-      const [minPrice, maxPrice] = ranges[currentTier];
-      list = list.filter(p => p.price != null && p.price >= minPrice && p.price <= maxPrice);
-    }
+    if (currentTier) list = list.filter(p => p.price != null && p.price <= ranges[currentTier]);
 
     FEED.innerHTML = '';
     if (list.length === 0) {
