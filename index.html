@@ -110,11 +110,11 @@
   </div>
   <div class="filters">
     <button class="filter-btn active" data-tier="">كل الأسعار</button>
-    <button class="filter-btn" data-tier="under_2000">أقل من 2,000</button>
-    <button class="filter-btn" data-tier="under_10000">أقل من 10,000</button>
-    <button class="filter-btn" data-tier="under_20000">أقل من 20,000</button>
-    <button class="filter-btn" data-tier="under_50000">أقل من 50,000</button>
-    <button class="filter-btn" data-tier="under_100000">أقل من 100,000</button>
+    <button class="filter-btn" data-tier="r1">100 - 5,000</button>
+    <button class="filter-btn" data-tier="r2">5,000 - 10,000</button>
+    <button class="filter-btn" data-tier="r3">10,000 - 20,000</button>
+    <button class="filter-btn" data-tier="r4">20,000 - 50,000</button>
+    <button class="filter-btn" data-tier="r5">50,000 - 100,000</button>
   </div>
 </header>
 
@@ -131,6 +131,8 @@
   const CHANNEL = "goudzl";
   const REFRESH_MS = 25000;
   const MAX_AGE_DAYS = 30;
+  const CONTACT_USERNAME = "goudzla_2"; // اليوزر بتاعك - أي بوست بيتفلتر عليه وبيتربط بيه
+  const MAX_PAGES = 20; // كل صفحة فيها ~20 رسالة تقريبًا، يعني ده بيغطي حوالي 400 رسالة للخلف
 
   // أكتر من رابط proxy احتياطي - لو الأول اتأخر أو فشل بيجرب اللي بعده
   const PROXIES = [
@@ -168,49 +170,38 @@
     return null;
   }
 
-  // بيدور على @username جوه النص عشان يعرف يوصل الزائر بصاحب العرض
-  function extractContactUsername(text) {
-    if (!text) return null;
-    const m = text.match(/@([a-zA-Z0-9_]{4,32})/);
-    return m ? m[1] : null;
+  function postLink() {
+    return `https://t.me/${CONTACT_USERNAME}`;
   }
 
-  function postLink(p) {
-    const username = extractContactUsername(p.text);
-    if (username) return `https://t.me/${username}`;
-    if (p.id && p.id.includes('/')) return `https://t.me/${p.id}`;
-    return `https://t.me/${CHANNEL}`;
-  }
-
-  async function fetchChannel() {
-    const targetUrl = `https://t.me/s/${CHANNEL}`;
-    let html = null;
-    let lastErr = null;
+  async function fetchOnePage(beforeId) {
+    const targetUrl = beforeId
+      ? `https://t.me/s/${CHANNEL}?before=${beforeId}`
+      : `https://t.me/s/${CHANNEL}`;
 
     for (const buildProxyUrl of PROXIES) {
       try {
         const res = await fetchWithTimeout(buildProxyUrl(targetUrl), 8000);
-        if (!res.ok) throw new Error('bad status');
-        html = await res.text();
-        if (html && html.length > 500) break; // رد سليم، وقف هنا
-      } catch (e) {
-        lastErr = e;
-        html = null;
-      }
+        if (!res.ok) continue;
+        const html = await res.text();
+        if (html && html.length > 500) return html;
+      } catch (e) { /* جرب البروكسي اللي بعده */ }
     }
+    return null;
+  }
 
-    if (!html) throw lastErr || new Error('فشل الاتصال بتليجرام');
-
+  function parsePage(html, seen, out) {
     const doc = new DOMParser().parseFromString(html, 'text/html');
     const wraps = doc.querySelectorAll('.tgme_widget_message_wrap');
+    let oldestId = null;
 
-    const seen = new Set();
-    const posts = [];
     wraps.forEach(wrap => {
       const msgEl = wrap.querySelector('.tgme_widget_message');
       if (!msgEl) return;
       const id = msgEl.getAttribute('data-post') || '';
-      if (id && seen.has(id)) return; // منع التكرار (البوستات اللي فيها أكتر من صورة بتتكرر جوه الصفحة)
+      const numId = id.split('/').pop();
+      if (numId) oldestId = oldestId ? Math.min(oldestId, parseInt(numId)) : parseInt(numId);
+      if (id && seen.has(id)) return;
       if (id) seen.add(id);
 
       const textEl = wrap.querySelector('.tgme_widget_message_text');
@@ -218,7 +209,7 @@
 
       const timeEl = wrap.querySelector('time');
       const dateStr = timeEl ? timeEl.getAttribute('datetime') : null;
-      if (!dateStr) return; // من غير تاريخ صحيح مينفعش نرتب صح، نتجاهله بدل ما يبوظ الترتيب
+      if (!dateStr) return;
       const date = new Date(dateStr).getTime() / 1000;
 
       let mediaUrl = null;
@@ -233,10 +224,44 @@
 
       if (!text && !mediaUrl) return;
 
-      posts.push({ id, text, date, mediaUrl, price: extractPrice(text) });
+      // يظهر بس البوستات اللي فيها يوزرك (بأي حالة أحرف)
+      const matchesContact = new RegExp('@' + CONTACT_USERNAME, 'i').test(text);
+      if (!matchesContact) return;
+
+      out.push({ id, text, date, mediaUrl, price: extractPrice(text) });
     });
 
-    posts.sort((a, b) => b.date - a.date); // الأحدث فوق دايمًا، بغض النظر عن ترتيبهم في صفحة تليجرام
+    return oldestId;
+  }
+
+  async function fetchChannel() {
+    const seen = new Set();
+    const posts = [];
+    const now = Date.now() / 1000;
+    const cutoff = now - (MAX_AGE_DAYS + 15) * 24 * 60 * 60; // هامش زيادة عشان قسم "مقترح ليك"
+
+    let beforeId = null;
+    let pagesFetched = 0;
+    let reachedEnd = false;
+
+    while (pagesFetched < MAX_PAGES && !reachedEnd) {
+      const html = await fetchOnePage(beforeId);
+      pagesFetched++;
+      if (!html) break; // فشل الاتصال، نوقف بالي عندنا لحد كده
+
+      const beforeCount = posts.length;
+      const oldestIdOnPage = parsePage(html, seen, posts);
+
+      if (!oldestIdOnPage || oldestIdOnPage === beforeId) break; // مفيش صفحات تانية
+      beforeId = oldestIdOnPage;
+
+      // لو أقدم بوست في الصفحة دي بقى أقدم من الحد المطلوب، بلاش نكمل نجيب صفحات زيادة
+      const oldestDateOnPage = Math.min(...posts.slice(beforeCount).map(p => p.date), Infinity);
+      if (posts.length === beforeCount) continue; // الصفحة دي مفيهاش حاجة اتفلترت، كمّل تاني صفحة برضه
+      if (oldestDateOnPage < cutoff) reachedEnd = true;
+    }
+
+    posts.sort((a, b) => b.date - a.date);
     return posts;
   }
 
@@ -245,8 +270,8 @@
     return `<span class="price-tag">${p.toLocaleString('en-US')} جنيه</span>`;
   }
 
-  function openPost(p) {
-    window.open(postLink(p), '_blank', 'noopener');
+  function openPost() {
+    window.open(postLink(), '_blank', 'noopener');
   }
 
   function renderPost(p) {
@@ -277,15 +302,18 @@
 
   function renderAll() {
     const ranges = {
-      under_2000: 2000, under_10000: 10000, under_20000: 20000,
-      under_50000: 50000, under_100000: 100000
+      r1: [100, 5000], r2: [5000, 10000], r3: [10000, 20000],
+      r4: [20000, 50000], r5: [50000, 100000]
     };
     const now = Date.now() / 1000;
     const maxAgeSec = MAX_AGE_DAYS * 24 * 60 * 60;
 
     // الفييد الرئيسي: من الأحدث لحد آخر عرض عدّى عليه 30 يوم بالظبط
     let list = allPosts.filter(p => (now - p.date) <= maxAgeSec);
-    if (currentTier) list = list.filter(p => p.price != null && p.price <= ranges[currentTier]);
+    if (currentTier) {
+      const [min, max] = ranges[currentTier];
+      list = list.filter(p => p.price != null && p.price >= min && p.price <= max);
+    }
 
     FEED.innerHTML = '';
     if (list.length === 0) {
